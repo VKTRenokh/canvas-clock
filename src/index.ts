@@ -1,14 +1,14 @@
-import './index.scss';
-import {Control} from "@/Control";
-import {Clock} from "@/clock";
+import { BaseComponent } from "./BaseComponent";
+import "./index.scss";
+import { Clock } from "@/clock";
 
-class App extends Control<"div">{
-    clock: Clock
+class App extends BaseComponent<"div"> {
+  clock: Clock;
 
-    constructor(parent: HTMLElement) {
-        super(parent, "div")
-        this.clock = new Clock(this.node)
-    }
+  constructor(parent: HTMLElement) {
+    super(parent, "div");
+    this.clock = new Clock(this.node, "000", 30);
+  }
 }
 
-new App(document.body)
+new App(document.body);

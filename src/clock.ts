@@ -1,35 +1,53 @@
-import {Control} from "@/Control";
+import { BaseComponent } from "./BaseComponent";
 
-class Clock extends Control<'canvas'> {
-    ctx: CanvasRenderingContext2D | null
+class Clock extends BaseComponent<"canvas"> {
+  ctx: CanvasRenderingContext2D | null;
+  frame: number | null = null;
 
-    constructor(parent: HTMLElement) {
-        super(parent, "canvas");
-        this.node.width = screen.availWidth
-        this.node.height = screen.availHeight
-        this.ctx = this.node.getContext('2d')
-        if (this.ctx) {
-            // this.ctx.fillStyle = "#000"
-            // this.ctx.fillRect(0, 0, this.node.width, this.node.height)
-        }
+  constructor(
+    parent: HTMLElement,
+    private clockColor: string,
+    private fontSize: number
+  ) {
+    super(parent, "canvas");
+    this.node.width = screen.availWidth;
+    this.node.height = screen.availHeight;
+    this.ctx = this.node.getContext("2d");
 
-        setInterval(() => this.tick())
+    const animate = () => {
+      this.redraw();
+
+      this.frame = requestAnimationFrame(animate);
+    };
+
+    animate();
+  }
+
+  redraw() {
+    if (!this.ctx) {
+      return;
     }
 
-    tick(ctx?: CanvasRenderingContext2D) {
-        const time = new Date().toLocaleTimeString();
-        if (this.ctx) {
-            this.ctx.clearRect(0, 0, this.node.width, this.node.height)
-            this.ctx.font = "bold 70px verdana, sans-serif";
-            // const textWidth = this.ctx.measureText(time).width
-            this.ctx.fillStyle = "#f0f"; //<======= and here
-            // this.ctx.textBaseline = 'middle';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(time, (this.node.width / 2), (this.node.height / 2));
-        }
+    this.ctx.clearRect(0, 0, this.node.width, this.node.height);
+
+    const date = new Date().toString();
+
+    this.ctx.font = `${this.fontSize}px Aerial`;
+
+    this.ctx.fillStyle = this.clockColor;
+
+    this.ctx.textAlign = "center";
+
+    this.ctx.fillText(date, this.node.width * 0.5, this.node.height * 0.5);
+  }
+
+  destroy(): void {
+    if (this.frame) {
+      cancelAnimationFrame(this.frame);
     }
+
+    super.destroy();
+  }
 }
 
-export {
-    Clock
-}
+export { Clock };
