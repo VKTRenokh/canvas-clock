@@ -7,7 +7,7 @@ class App extends BaseComponent<"div"> {
 
   constructor(parent: HTMLElement) {
     super(parent, "div");
-    this.clock = new Clock(this.node, "000", 30);
+    this.clock = new Clock(this.node, window.innerWidth, window.innerHeight);
   }
 }
 

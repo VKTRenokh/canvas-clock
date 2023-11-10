@@ -1,4 +1,4 @@
-class BaseComponent<NodeType extends keyof HTMLElementTagNameMap> {
+export class BaseComponent<NodeType extends keyof HTMLElementTagNameMap> {
   node: HTMLElementTagNameMap[NodeType];
 
   constructor(
@@ -18,5 +18,3 @@ class BaseComponent<NodeType extends keyof HTMLElementTagNameMap> {
     this.node.remove();
   }
 }
-
-export { BaseComponent };
