@@ -1,4 +1,4 @@
-import { Rgba } from "@/utils/rgbaToArrayBuffer";
+import { Rgba } from "@/utils/rgbaMatrixToFloat32Array";
 
 export const red: Rgba = [1.0, 0.0, 0.0, 1.0];
 export const green: Rgba = [0.0, 1.0, 0.0, 1.0];

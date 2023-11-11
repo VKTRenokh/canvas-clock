@@ -5,13 +5,16 @@ import { Info } from "./types/info";
 import { Buffers } from "./buffers/buffers";
 
 export class Clock extends BaseComponent<"canvas"> {
-  private ctx = maybe(this.node.getContext("webgl2"));
   private frame = maybe<number>(null);
+  private ctx = maybe<WebGL2RenderingContext>(null);
+  private speed = 0.001;
 
   constructor(parent: HTMLElement, width: number, height: number) {
     super(parent, "canvas");
     this.node.width = width;
     this.node.height = height;
+
+    this.ctx = maybe(this.node.getContext("webgl2"));
 
     this.redraw();
   }
@@ -62,40 +65,38 @@ export class Clock extends BaseComponent<"canvas"> {
     gl: WebGL2RenderingContext,
     programInfo: Info,
     buffers: Buffers,
-    rotation: number
+    rotation: number,
+    rotationX: number,
+    rotationY: number
   ) {
     gl.clearColor(1.0, 0.49, 0, 1.0);
-    gl.clearDepth(1);
+    gl.clearDepth(1.0);
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    const fov = (45 * Math.PI) / 100;
+    const fov = (45 * Math.PI) / 180;
 
     const aspect = gl.canvas.width / gl.canvas.height;
 
-    const near = 0.1;
-    const far = 100.0;
+    const nearZ = 0.1;
+    const farZ = 500.0;
 
     const projection = mat4.create();
 
-    mat4.perspective(projection, fov, aspect, near, far);
+    mat4.perspective(projection, fov, aspect, nearZ, farZ);
 
     const modelView = mat4.create();
 
-    mat4.translate(modelView, modelView, [0.0, 0.0, -5.0]);
+    mat4.translate(modelView, modelView, [0.0, 0.0, -6.0]);
 
     mat4.rotate(modelView, modelView, rotation, [0, 0, 1]);
-    mat4.rotate(modelView, modelView, rotation * 0.7, [0, 1, 0]);
-    mat4.rotate(modelView, modelView, rotation * 0.3, [1, 0, 0]);
+    mat4.rotate(modelView, modelView, rotationX, [0, 1, 0]);
+    mat4.rotate(modelView, modelView, rotationY, [1, 0, 0]);
 
-    const normal = mat4.create();
-    mat4.invert(normal, modelView);
-    mat4.transpose(normal, normal);
-
-    this.setColor(gl, programInfo, buffers);
     this.setPosition(gl, programInfo, buffers);
+    this.setColor(gl, programInfo, buffers);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
 
@@ -111,12 +112,6 @@ export class Clock extends BaseComponent<"canvas"> {
       false,
       modelView
     );
-    gl.uniformMatrix4fv(
-      programInfo.uniformLocations.normalMatrix,
-      false,
-      normal
-    );
-
     gl.drawElements(gl.TRIANGLE_STRIP, 36, gl.UNSIGNED_SHORT, 0);
   }
 
@@ -148,63 +143,30 @@ export class Clock extends BaseComponent<"canvas"> {
     gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
   }
 
-  setNormal(gl: WebGL2RenderingContext, programInfo: Info, buffers: Buffers) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers.normal);
-    gl.vertexAttribPointer(
-      programInfo.attribLocations.vertexNormal,
-      3,
-      gl.FLOAT,
-      false,
-      0,
-      0
-    );
-    gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal);
-  }
-
   redraw() {
     this.ctx.map((gl) => {
       const v = `
-    attribute vec4 aVertexPosition;
-    attribute vec4 aVertexColor;
-    attribute vec3 aVertexNormal;
+          attribute vec4 aVertexPosition;
+          attribute vec4 aVertexColor;
 
-    uniform mat4 uModelViewMatrix;
-    uniform mat4 uProjectionMatrix;
-    uniform mat4 uNormalMatrix;
+          uniform mat4 uModelViewMatrix;
+          uniform mat4 uProjectionMatrix;
 
-    varying lowp vec4 vColor;
-    varying highp vec3 vLighting;
+          varying lowp vec4 vColor;
 
-    void main(void) {
-      gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-      vColor = aVertexColor;
-
-      highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
-      highp vec3 directionalLightColor = vec3(1, 1, 1);
-      highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
-
-      highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
-
-      highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
-      vLighting = ambientLight + (directionalLightColor * directional);
-    }  `;
+          void main(void) {
+            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+            vColor = aVertexColor;
+          }
+`;
 
       const f = `
-      varying lowp vec4 vColor;
-      varying highp vec3 vLighting;
+         varying lowp vec4 vColor;
 
-      uniform sampler2D uSampler;
-
-      void main(void) {
-        // Remove this line, as it overwrites gl_FragColor with vColor
-        // gl_FragColor = vColor;
-
-        highp vec4 texelColor = texture2D(uSampler, gl_PointCoord);
-
-        // Modify the next line to multiply the texture color with vColor and vLighting
-        gl_FragColor = vec4(texelColor.rgb * vColor.rgb * vLighting, texelColor.a);
-      }
-`;
+         void main(void) {
+           gl_FragColor = vColor;
+         }
+      `;
 
       const shaderProgram = this.initShader(gl, v, f);
       const buffers = this.initBuffers(gl);
@@ -218,37 +180,52 @@ export class Clock extends BaseComponent<"canvas"> {
               "uProjectionMatrix"
             ),
             modelViewMatrix: gl.getUniformLocation(program, "uModelViewMatrix"),
-            normalMatrix: gl.getUniformLocation(program, "uNormalMatrix"),
           },
           attribLocations: {
             vertexPosition: gl.getAttribLocation(program, "aVertexPosition"),
             vertexColor: gl.getAttribLocation(program, "aVertexColor"),
-            vertexNormal: gl.getAttribLocation(program, "aVertexNormal"),
           },
         };
 
-        gl.clearColor(0.0, 255.0, 0.0, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-
-        let then = 0;
-        let deltaTime = 0;
+        // let then = 0;
+        // let deltaTime = 0;
+        let rotationX = 0;
+        let rotationY = 0;
         let rotation = 0;
 
         const a = (time: number) => {
-          const now = (time *= 0.001);
-          deltaTime = now - then;
-          then = now;
+          // const now = (time *= this.speed);
+          // deltaTime = now - then;
+          // then = now;
 
-          this.drawScene(gl, info, buffers, rotation);
+          this.drawScene(
+            gl,
+            info,
+            this.initBuffers(gl),
+            rotation,
+            rotationX,
+            rotationY
+          );
 
-          rotation += deltaTime;
+          // rotation += deltaTime;
 
-          requestAnimationFrame(a);
+          this.frame = maybe(requestAnimationFrame(a));
         };
-        requestAnimationFrame(a);
+        this.frame = maybe(requestAnimationFrame(a));
+
+        this.node.onclick = () => {
+          this.node.requestPointerLock();
+        };
+
+        window.onmousemove = (e) => {
+          rotationY += e.movementY / 100;
+          rotationX += e.movementX / 100;
+        };
       });
     });
   }
+
+  changeSpeed() {}
 
   destroy(): void {
     this.frame.map((frame) => cancelAnimationFrame(frame));
